@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 
-dll = ctypes.WinDLL(r'C:\Program Files\AS5216x64-DLL_2.3\examples\Vcpp2008\as5216x64.dll')
+dll = ctypes.WinDLL(r'C:\ProgramData\avantes\AS5216x64-DLL_2.3\examples\LabView\LabViewSingleChan\as5216x64.dll')
 
 
 class AvsIdentityType(ctypes.Structure):
