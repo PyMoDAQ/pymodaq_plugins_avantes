@@ -196,6 +196,9 @@ class AvaSpecLib:
             return bool(dll.AVS_PollScan(self._handle))
         return False
 
+    def stop(self):
+        ...
+
     def get_data(self):
         err = None
         if self._handle is not None:
