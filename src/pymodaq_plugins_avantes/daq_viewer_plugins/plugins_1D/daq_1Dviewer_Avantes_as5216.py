@@ -1,4 +1,5 @@
 import numpy as np
+from qtpy.QtCore import QTimer
 from easydict import EasyDict as edict
 from pymodaq.utils.daq_utils import ThreadCommand, getLineInfo
 from pymodaq.utils.data import DataFromPlugins, Axis
@@ -6,9 +7,6 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, como
 from pymodaq.utils.parameter import Parameter
 
 
-class PythonWrapperOfYourInstrument:
-    #  TODO Replace this fake class with the import of the real python wrapper of your instrument
-    pass
 
 
 class DAQ_1DViewer_Avantes_as5216(DAQ_Viewer_base):
@@ -28,6 +26,19 @@ class DAQ_1DViewer_Avantes_as5216(DAQ_Viewer_base):
         # TODO declare here attributes you want/need to init with a default value
 
         self.x_axis = None
+        self.timer = QTimer()
+        self.timer.setInterval(10)
+        self.timer.timeout.connected(self.data_ready)
+
+    def data_ready(self):
+        if self.controller.poll():
+            data = self.controller.get_data()
+
+            self.data_grabed_signal.emit([DataFromPlugins(name='Avantes', data=[data],
+                                                          dim='Data1D', labels=['dat0',])])
+            self.timer.stop()
+            # note: you could either emit the x_axis once (or a given place in the code) using self.emit_x_axis() as shown
+            # above. Or emit it at every grab filling it the x_axis key of DataFromPlugins, not shown here)
 
     def commit_settings(self, param: Parameter):
         """Apply the consequences of a change of value in the detector settings
@@ -100,21 +111,9 @@ class DAQ_1DViewer_Avantes_as5216(DAQ_Viewer_base):
 
         ##synchrone version (blocking function)
         data_tot = self.controller.your_method_to_start_a_grab_snap()
-        self.data_grabed_signal.emit([DataFromPlugins(name='Mock1', data=data_tot,
-                                                      dim='Data1D', labels=['dat0', 'data1'])])
-        # note: you could either emit the x_axis once (or a given place in the code) using self.emit_x_axis() as shown
-        # above. Or emit it at every grab filling it the x_axis key of DataFromPlugins, not shown here)
-
-        ##asynchrone version (non-blocking function with callback)
-        self.controller.your_method_to_start_a_grab_snap(self.callback)
-        #########################################################
+        self.timer.start()
 
 
-    def callback(self):
-        """optional asynchrone method called when the detector has finished its acquisition of data"""
-        data_tot = self.controller.your_method_to_get_data_from_buffer()
-        self.data_grabed_signal.emit([DataFromPlugins(name='Mock1', data=data_tot,
-                                                      dim='Data1D', labels=['dat0', 'data1'])])
 
     def stop(self):
         """Stop the current grab hardware wise if necessary"""

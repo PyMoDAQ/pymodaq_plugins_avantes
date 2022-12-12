@@ -11,7 +11,8 @@ import numpy as np
 import time
 from pathlib import Path
 
-
+from os import environ
+environ['AvantesPath']
 dll = ctypes.WinDLL(r'C:\ProgramData\avantes\AS5216x64-DLL_2.3\examples\LabView\LabViewSingleChan\as5216x64.dll')
 
 
