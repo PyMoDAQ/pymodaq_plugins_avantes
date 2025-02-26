@@ -1,9 +1,9 @@
-pymodaq_plugins_template
-########################
+pymodaq_plugins_avantes
+#######################
 
 .. the following must be adapted to your developed package, links to pypi, github  description...
 
-.. image:: https://img.shields.io/pypi/v/pymodaq_plugins_template.svg
+.. image:: https://img.shields.io/pypi/v/pymodaq_plugins_avantes.svg
    :target: https://pypi.org/project/pymodaq_plugins_template/
    :alt: Latest Version
 
@@ -11,12 +11,12 @@ pymodaq_plugins_template
    :target: https://pymodaq.readthedocs.io/en/stable/?badge=latest
    :alt: Documentation Status
 
-.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_template/workflows/Upload%20Python%20Package/badge.svg
-   :target: https://github.com/PyMoDAQ/pymodaq_plugins_template
+.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_avantes/workflows/Upload%20Python%20Package/badge.svg
+   :target: https://github.com/PyMoDAQ/pymodaq_plugins_avantes
    :alt: Publication Status
 
-.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_template/actions/workflows/Test.yml/badge.svg
-    :target: https://github.com/PyMoDAQ/pymodaq_plugins_template/actions/workflows/Test.yml
+.. image:: https://github.com/PyMoDAQ/pymodaq_plugins_avantes/actions/workflows/Test.yml/badge.svg
+    :target: https://github.com/PyMoDAQ/pymodaq_plugins_avantes/actions/workflows/Test.yml
 
 
 Use this template to create a repository on your account and start the development of your own PyMoDAQ plugin!
@@ -27,18 +27,6 @@ Authors
 
 * First Author  (myemail@xxx.org)
 * Other author (myotheremail@xxx.org)
-
-.. if needed use this field
-
-    Contributors
-    ============
-
-    * First Contributor
-    * Other Contributors
-
-.. if needed use this field
-
-  Depending on the plugin type, delete/complete the fields below
 
 
 Instruments
