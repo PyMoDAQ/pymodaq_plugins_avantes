@@ -1,0 +1,440 @@
+import numpy as np
+import csv, time
+from pymodaq.utils.gui_utils.custom_app import CustomApp
+from pymodaq.utils.gui_utils import DockArea, Dock
+from pymodaq.control_modules.daq_viewer import DAQ_Viewer
+from pymodaq.utils.plotting.data_viewers.viewer1D import Viewer1D
+from pymodaq.utils.data import DataToExport, DataFromPlugins
+from PyQt5.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
+    QFileDialog
+from PyQt5.QtCore import QByteArray, QSettings, QTimer
+from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
+from pyqtgraph import PlotItem, PlotDataItem, ViewBox
+from pyqtgraph import GraphicsWidget, PlotWidget
+
+class AvantesMain(QMainWindow):
+
+    def __init__(self):
+        QMainWindow.__init__(self)
+        self.close_enabled = True
+
+    def enable_close(self, enable):
+        self.close_enabled = enable
+
+    def closeEvent(self, event):
+        if self.close_enabled:
+            self.application.clean_up()
+            QMainWindow.closeEvent(self, event)
+
+
+RAW             = 0
+WITH_BACKGROUND = 1
+ABSORPTION      = 2
+
+CONTINUOUS = 0
+LINEAR     = 1
+LIN_LOG    = 2
+
+class AvantesApp(CustomApp):
+
+    measurement_modes = { 'Raw': RAW, 'Background Subtracted': WITH_BACKGROUND,
+                          'Absorption': ABSORPTION }
+    scan_modes = { 'Continuous': CONTINUOUS, 'Linear Sequential': LINEAR,
+                   'Lin-log Sequential': LIN_LOG }
+    scan_params = ['linear_step', 'scan_end', 'log_start', 'points_per_decade' ]
+    visible_params = { CONTINUOUS: [], LINEAR: ['linear_step', 'scan_end'],
+                       LIN_LOG: scan_params }
+
+    params = [{'name': 'integration_time', 'title': 'Integration Time',
+               'type': 'float', 'min': 0.001, 'max': 100, 'value': 0.05,
+               'tip': 'Integration time in seconds'},
+              {'name': 'averaging', 'title': 'Averaging',
+               'type': 'int', 'min': 1, 'max': 1000, 'value': 1,
+               'tip': 'Software Averaging'},
+              {'name': 'measurement_mode', 'title': 'Measurement Mode',
+               'type': 'list', 'limits': list(measurement_modes.keys()),
+               'tip': 'Measurement Mode'},
+              {'name': 'scan_mode', 'title': 'Scan Mode', 'type': 'list',
+               'limits': list(scan_modes.keys()), 'tip': 'Scan Mode'},
+              {'name': 'linear_step', 'title': 'Linear Scan Step',
+               'type': 'float', 'min': 0.001, 'max': 1000, 'value': 1,
+               'tip': 'Scan step in seconds'},
+              {'name': 'scan_end', 'title': 'Scan End', 'value': 100,
+               'type': 'float', 'min': 1, 'max': 10000,
+               'tip': 'End of measurement in seconds'},
+              {'name': 'log_start', 'title': 'Log Start',
+               'type': 'float', 'min': 1, 'max': 10000, 'value': 10,
+               'tip': 'Start of logarithmic scale in seconds'},
+              {'name': 'points_per_decade', 'title': 'Points per Decade',
+               'type': 'float', 'min': 1, 'max': 10000, 'value': 10,
+               'tip': 'Logarithmic points per time decade measurement'},
+              ]
+
+    def __init__(self, parent: DockArea, plugin="avantes"):
+        super().__init__(parent)
+
+        self.plugin = plugin
+        self.setup_ui()
+
+        # keep screen geometry between runs, could be integrated into
+        # PyMoDAQ settings
+        settings = QSettings("chiphy", "avantes")
+        geometry = settings.value("geometry", QByteArray())
+        self.mainwindow.restoreGeometry(geometry)
+        state = settings.value("dockarea")
+        if state is not None:
+            try:
+                self.dockarea.restoreState(state)
+            except: # pyqtgraph's state restoring is not very fail safe
+                settings.setValue("dockarea", None)
+        self.measurement_mode = RAW
+        self.have_background = False
+        self.have_reference = False
+        self.scan_mode = CONTINUOUS
+        self.acquiring = False
+        self.adjust_actions()
+        self.adjust_parameters()
+
+    def setup_docks(self):
+        # left column: essential parameters at top, small plots for dark and
+        # reference signals
+        # main area for current data
+
+        # top left, essential parameters
+        self.docks['settings'] = Dock('Application Settings')
+        self.dockarea.addDock(self.docks['settings'])
+        self.docks['settings'].addWidget(self.settings_tree)
+
+        # main area with spectrum plot
+        spectrum_dock = Dock('Data')
+        self.docks['spectrum'] = \
+            self.dockarea.addDock(spectrum_dock, "right", self.docks['settings'])
+        spectrum_widget = QWidget()
+        self.spectrum_viewer = Viewer1D(spectrum_widget)
+        spectrum_dock.addWidget(spectrum_widget)
+
+        # progress bar for time sequence
+        progress_dock = Dock("Progress")
+        self.docks['progress'] = \
+            self.dockarea.addDock(progress_dock, 'bottom',
+                                  self.docks['settings'])
+        progress_widget = QProgressBar()
+        progress_dock.addWidget(progress_widget)
+
+        # plot for raw spectrum data and reference 
+        raw_data_dock = Dock('Raw Data')
+        self.docks['raw-data'] = \
+            self.dockarea.addDock(raw_data_dock, "bottom",
+                                  self.docks['progress'])
+        raw_data_widget = QWidget()
+        self.raw_data_viewer = Viewer1D(raw_data_widget)
+        self.raw_data_viewer.toolbar.hide()
+
+        raw_data_dock.addWidget(raw_data_widget)
+
+        # plot for background 
+        background_dock = Dock('Background')
+        self.docks['background'] = \
+            self.dockarea.addDock(background_dock, "bottom",
+                                  self.docks['raw-data'])
+        background_widget = QWidget()
+        self.background_viewer = Viewer1D(background_widget)
+        background_dock.addWidget(background_widget)
+        self.background_viewer.toolbar.hide()
+
+        # separate window with raw detector data
+        self.daq_viewer_area = DockArea()
+        self.detector = DAQ_Viewer(self.daq_viewer_area,  title="Avantes")
+        self.detector.daq_type = 'DAQ1D'
+        self.detector.detector = self.plugin
+        self.detector.init_hardware()
+
+    def setup_actions(self):
+        self.add_action('quit', 'Quit', 'close2', "Quit program",
+                        checkable=False, toolbar=self.toolbar)
+        self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
+                        "Acquire", checkable=False, toolbar=self.toolbar)
+        self.add_action('background', 'Take Background', 'camera',
+                        "Take Background", checkable=False, toolbar=self.toolbar)
+        self.add_action('reference', 'Take Reference', 'camera',
+                        "Take Reference", checkable=False, toolbar=self.toolbar)
+        self.add_action('save', 'Save', 'SaveAs', "Save current data",
+                        checkable=False, toolbar=self.toolbar)        
+        self.add_action('show', 'Show/hide', 'read2', "Show Hide DAQViewer",
+                        checkable=True, toolbar=self.toolbar)
+
+    def connect_things(self):
+        self.connect_action('quit', self.quit_function)
+        self.connect_action('save', self.save_current_data)
+        self.connect_action('show', self.show_detector)
+        self.connect_action('acquire', self.acquire)
+        self.connect_action('background', self.take_background)
+        self.connect_action('reference', self.take_reference)
+        self.detector.grab_done_signal.connect(self.show_data)
+
+    def setup_menu(self):
+        file_menu = self.mainwindow.menuBar().addMenu('File')
+        self.affect_to('save', file_menu)
+
+        file_menu.addSeparator()
+        self.affect_to('quit', file_menu)
+
+    def value_changed(self, param):
+        if param.name() == "integration_time":
+            self.detector.settings.child('detector_settings',
+                                         'integration_time') \
+                                  .setValue(param.value())
+            if self.measurement_mode in [WITH_BACKGROUND, ABSORPTION]:
+                self.detector.stop()
+            self.detector.controller.set_integration_time(param.value() * 1000)
+            self.have_background = False
+            self.have_reference = False
+        if param.name() == "averaging":
+            self.detector.settings.child('main_settings', 'Naverage') \
+                                         .setValue(param.value())
+            self.have_background = False
+            self.have_reference = False
+        elif param.name() == "measurement_mode":
+            self.measurement_mode = self.measurement_modes[param.value()]
+        elif param.name() == "scan_mode":
+            self.detector.stop()
+            self.scan_mode = self.scan_modes[param.value()]
+            self.adjust_parameters()
+        self.adjust_operation()
+        self.adjust_actions()
+
+    def adjust_operation(self):
+        if self.measurement_mode >= WITH_BACKGROUND:
+            if not self.have_background:
+                self.detector.stop()
+            elif self.measurement_mode == ABSORPTION and not self.have_reference:
+                self.detector.stop()
+
+    def adjust_actions(self):
+        if self.measurement_mode == RAW:
+            self._actions["acquire"].setEnabled(True)
+            self._actions["background"].setEnabled(False)
+            self._actions["reference"].setEnabled(False)
+        if self.measurement_mode == WITH_BACKGROUND:
+            self._actions["acquire"].setEnabled(self.have_background)
+            self._actions["background"].setEnabled(True)
+            self._actions["reference"].setEnabled(self.have_background)
+        if self.measurement_mode == ABSORPTION:
+            self._actions["acquire"].setEnabled(self.have_reference)
+            self._actions["background"].setEnabled(True)
+            self._actions["reference"].setEnabled(self.have_background)
+
+    def adjust_parameters(self):
+        for child in self.scan_params:
+            if child in self.visible_params[self.scan_mode]:
+                self.settings.child(child).show()
+            else:
+                self.settings.child(child).hide()
+
+    def show_detector(self, status):
+        self.daq_viewer_area.setVisible(status)
+
+    def show_data(self, data: DataToExport):
+        """
+        ----------
+        data: DataToExport
+        """
+        data1D = data.get_data_from_dim('Data1D')
+        signal = data1D[0]
+        ava_time_stamp = data.get_data_from_name('timestamp')[0][0] / 100
+        system_time_stamp = time.time_ns() * 1e-6
+
+        if self.measurement_mode != RAW:
+            if not hasattr(self, 'background'):
+                return
+            signal[0] -= self.background
+            signal.labels = ['signal-background']
+
+        if self.measurement_mode == ABSORPTION:
+            if not hasattr(self, 'reference'):
+                return
+            valid_mask = np.logical_and(signal[0] > 0, self.reference_valid_mask)
+            absorption = np.where(valid_mask,
+                                  -np.log10(signal[0] / self.reference), 0)
+            dfp = DataFromPlugins(name='absorption', data=[absorption],
+                              dim='Data1D', labels=['absorption'])
+            self.spectrum_viewer.show_data(dfp)
+            dfp = DataFromPlugins(name='raw',
+                                  data=[signal[0], self.reference],
+                                  dim='Data1D', labels=['signal', 'reference'])
+            self.raw_data_viewer.show_data(dfp)
+            self.current_data = absorption
+        else:
+            self.current_data = signal[0]
+            self.spectrum_viewer.show_data(signal)
+
+        if self.scan_mode == CONTINUOUS or not self.acquiring:
+            return
+
+        # scanning mode: store data and reschedule
+        if self.system_start_time is None:
+            self.ava_start_time = ava_time_stamp
+            self.system_start_time = system_time_stamp
+        ava_time_stamp -= self.ava_start_time
+        system_time_stamp -= self.system_start_time
+
+        if self.measurement_mode == ABSORPTION:
+            self.write_spectrum(int(system_time_stamp + 0.5),
+                                int(ava_time_stamp + 0.5),
+                                self.current_data * 1000)
+        else:
+            self.write_spectrum(int(system_time_stamp + 0.5),
+                                int(ava_time_stamp + 0.5), self.current_data)
+
+        # advance time index until next measurement is in futur
+        old_idx = self.current_time_index
+        while self.scheduled_measurement_times[self.current_time_index] \
+              <= system_time_stamp:
+            self.current_time_index += 1
+            if self.current_time_index == len(self.scheduled_measurement_times):
+                self.data_file.close()
+                return
+
+        if self.current_time_index == old_idx + 1:
+            time_delay = \
+                self.scheduled_measurement_times[self.current_time_index] \
+                - system_time_stamp
+            # schedule next measurement
+            QTimer.singleShot(int(time_delay), self.detector.snap)
+        else: # missed scheduled point(s): restart measurement directly
+            self.detector.snap()
+
+    def acquire(self):
+        """Start acquisition"""
+
+        if self.acquiring: # rather stop it
+            self.acquiring = False
+            return
+
+        self.acquiring = True
+        if self.scan_mode == CONTINUOUS:
+            self.detector.grab() # just go
+            return
+
+        result = QFileDialog.getSaveFileName(caption="Save Data", dir=".",
+                                             filter="*.csv")
+        if result is None:
+            return
+
+        # write wavelengths into file
+        self.data_file = open(result[0], "wt")
+        self.data_file.write('0\t0')
+        for wl in self.detector.controller.wavelengths:
+            self.data_file.write('\t%.1f' % wl)
+        self.data_file.write('\n')
+
+        # background (time delay -1) and reference (time delay -2) if needed
+        if self.measurement_mode >= WITH_BACKGROUND:
+            self.write_spectrum(-1, 0, self.background)
+            if self.measurement_mode == ABSORPTION:
+                self.write_spectrum(-2, 0, self.reference)
+
+        # calculate schedule, only linear for the moment, ignore lin-log
+        scan_end = self.settings['scan_end'] * 1000
+        linear_step = self.settings['linear_step'] * 1000
+        n_measurements = int(scan_end / linear_step) + 1
+        self.scheduled_measurement_times = \
+            np.linspace(0, scan_end, n_measurements) \
+            - self.settings['integration_time'] * 1000 - 20
+
+        # and go
+        self.current_time_index = 0
+        self.system_start_time = None
+        self.detector.snap()
+
+    def write_spectrum(self, t1, t2, spectrum):
+        """Writes a single spectrum to file.
+           The first two columns contain the system time at data retrieval
+           and the time stamp returned by the avaspec library, respectively."""
+        self.data_file.write('%d\t%d'
+                             % (int(np.floor(t1 + 0.5)),
+                                int(np.floor(t2 + 0.5))))
+        for value in spectrum:
+            self.data_file.write('\t%d' % (value * 1000 + 0.5))
+        self.data_file.write('\n')
+
+    def take_background(self):
+        """Grab one background spectrum."""
+
+        data,timestamp = self.detector.controller.grab_spectrum()
+        self.background = data
+        self.have_background = True
+        self.adjust_actions()
+        dfp = DataFromPlugins(name='Avantes', data=data, dim='Data1D',
+                              labels=['background'])
+        self.spectrum_viewer.show_data(dfp)
+        self.background_viewer.show_data(dfp)
+
+    def take_reference(self):
+        """Grab one reference spectrum."""
+
+        data,timestamp = self.detector.controller.grab_spectrum()
+        data -= self.background
+        self.reference_valid_mask = data > 0
+        self.reference = np.where(self.reference_valid_mask, data, 1)
+        self.have_reference = True
+        self.adjust_actions()
+        dfp = DataFromPlugins(name='Avantes', data=data, dim='Data1D',
+                              labels=['data'])
+        self.spectrum_viewer.show_data(dfp)
+        dfp = DataFromPlugins(name='Avantes', data=self.reference, dim='Data1D',
+                              labels=['reference'])
+        self.raw_data_viewer.show_data(dfp)
+
+    def save_current_data(self):
+        """Save dat currently displayed on the main plot."""
+        if not hasattr(self, 'current_data'):
+            return
+        result = QFileDialog.getSaveFileName(caption="Save Data", dir=".",
+                                             filter="*.csv")
+        if result is None:
+            return
+        wavelengths = self.detector.controller.wavelengths
+        with open(result[0], "wt") as csv_file:
+            writer = csv.writer(csv_file, delimiter='\t',
+                                quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            for i,wl in enumerate(wavelengths):
+                writer.writerow([wl, self.current_data[i]])
+
+    def quit_function(self):
+        self.clean_up()
+        self.mainwindow.close()
+
+    def clean_up(self):
+        self.detector.quit_fun()
+        QApplication.processEvents()
+        settings = QSettings("chiphy", "avantes")
+        settings.setValue("geometry", self.mainwindow.saveGeometry())
+        settings.setValue("dockarea", self.dockarea.saveState())
+
+
+def main():
+    import sys
+    from pymodaq.utils.gui_utils.utils import mkQApp
+    from PyQt5.QtCore import pyqtRemoveInputHook
+    app = mkQApp('Avantes')
+    pyqtRemoveInputHook()
+
+    mainwindow = AvantesMain()
+    dockarea = DockArea()
+    mainwindow.setCentralWidget(dockarea)
+
+    # todo: change the name here to be the same as your app class
+    if len(sys.argv) > 1 and sys.argv[1] == '--simulate':
+        prog = AvantesApp(dockarea, plugin="avantes_simu")
+    else:
+        prog = AvantesApp(dockarea)
+    mainwindow.application = prog # not very clean
+
+    mainwindow.show()
+
+    app.exec()
+
+
+if __name__ == '__main__':
+    main()
