@@ -8,27 +8,12 @@ from pymodaq.utils.parameter import Parameter
 from pymodaq_plugins_avantes.hardware.AvaSpec_ULS2048CL_EVO_Controller \
     import AvantesController
 
-position = {
-    "OFF":   0,
-    "ON":    1,
-    "OPEN":  1,
-    "CLOSE": 0
-    }
 
-
-class DAQ_1DViewer_avantes(DAQ_Viewer_base):
+class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
     """ Avantes Spectrometer Instrument plugin class for a 1D viewer.
-    
-    This object inherits all functionalities to communicate with PyMoDAQ’s
-    DAQ_Viewer module through inheritance via DAQ_Viewer_base. It makes
-    a bridge between the DAQ_Viewer module and the Python wrapper of a
-    particular instrument.
-
-    Attributes:
-    -----------
-    controller: object
-        The particular object that allow the communication with the hardware,
-        in general a python wrapper around the hardware library.
+    Besides acquiring spectral data, the Avantes device may control ten digital
+    output lines. They are exposed to PyMoDAQ as parameters. Acquisition on
+    digital and analog input lines is not yet supported.
     """
 
     # define controller type for easy autocompletion
@@ -45,25 +30,16 @@ class DAQ_1DViewer_avantes(DAQ_Viewer_base):
          ]
 
     def ini_attributes(self):
-        #  Assign the Avantes controller
         self.controller: self.controller_type = None
-
-        # Attributes to be able to set the X axis title and units used
         self.x_axis = None
 
     def commit_settings(self, param: Parameter):
-        """Apply the consequences of a change of value in the detector settings
-
-        Parameters
-        ----------
-        param: Parameter
-            A given parameter (within detector_settings) whose value has
-            been changed by the user
-        """
-
         if param.name() == "integration_time":
             self.controller.set_integration_time(param.value() * 1000)
         elif param.name()[:7] == 'output_':
+            # Note: digital outputs are not really parameters. However and
+            # for the time being, this seems to come closest to PyMoDAQ's
+            # functionallity.
             self.controller.set_digital_output(int(param.name()[7:]),
                                                param.value())
 
@@ -98,10 +74,8 @@ class DAQ_1DViewer_avantes(DAQ_Viewer_base):
                                   data=[np.zeros(len(wavelengths))],
                                   dim='Data1D', axes=[self.x_axis],
                                   labels=['Avantes-Signal'])
-            self.dte_signal_temp.emit(DataToExport(name='Avantes',
-                                                   data=[dfp]))
-
-            self.controller.configure_acquisition_by_default()
+            self.dte_signal_temp.emit(DataToExport(name='Avantes', data=[dfp]))
+            self.controller.set_default_config()
 
         info = "Avantes Spectro initilialized"
         initialized = True
@@ -117,17 +91,13 @@ class DAQ_1DViewer_avantes(DAQ_Viewer_base):
         return initialized
 
     def grab_data(self, Naverage=1, **kwargs):
-        """Start a grab from the detector
-        Use a synchrone acquisition  (blocking function)
+        """Start grabbing from the detector
+        Use a synchrone acquisition (blocking function)
 
         Parameters
         ----------
         Naverage: int
-            Number of hardware averaging (if hardware averaging is possible, 
-            self.hardware_averaging should be set to
-            True in class preamble and you should code this implementation)
-        kwargs: dict
-            others optionals arguments
+            Number of hardware averaging.
         """
 
         data,timestamp = self.controller.grab_spectrum()

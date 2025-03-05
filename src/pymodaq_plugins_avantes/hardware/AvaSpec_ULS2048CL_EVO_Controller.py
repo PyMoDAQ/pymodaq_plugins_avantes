@@ -109,7 +109,7 @@ class AvantesController:
         """
         avaspec.AVS_Done()
 
-    def configure_acquisition_by_default(self):
+    def set_default_config(self):
         """
         Configure the acquisition using the _measconfig object using
         default parameters and send the configuration to the spectrometer
@@ -323,6 +323,8 @@ class AvantesController:
         self.pymodaq_callback(np.array_split(full_data, 2)[0])
 
 
+### simulating non existing device for debugging purpose
+
 PIN_SIGNAL     = 2
 PIN_REFERENCE  = 6
 PIN_AVALIGHT   = 3
@@ -330,26 +332,9 @@ PIN_EXCITATION = 9
 
 
 class AvantesSimuController(AvantesController):
-    """
-    Controller for the Avantes Spectrometer AvaSPec-ULS2048CL-EVO
-    This class relies on communication with the instrument via USB-3 link
-
-    Additional methods provide control over digital output and analog input
-    See Avantes doc. and avaspec.py module
-    Remark:
-            - The AVS spectrometer functions are managed over 4096 pixels even
-              though the spectrometer has only 2048 pixels.
-            - Only a single USB spectrometer is controlled.
-            - For asynchronous measurement with callback function, see either
-              AvantesControllerTestApp.py or PyQt5_demo.py
-    """
+    """Simulates data in case no spectrometer is connected."""
 
     def __init__(self, initial_line_states=0):
-        """
-        Method called at object creation (implementation)
-        Init object attributes
-        """
-
         AvantesController.__init__(self)
         self._pin_states = [initial_line_states for _ in range(10)]
         self._signal = 3000 * np.exp(-((self.wavelengths - 600) / 300)**4)
