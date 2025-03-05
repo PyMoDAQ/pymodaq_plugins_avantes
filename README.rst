@@ -36,8 +36,9 @@ Installation instructions
 =========================
 
 * PyMoDAQ 4.3.0.
-* Debian Linux 12, Windows 10
+* tested: Debian Linux 11/12, Windows 10/11
 * Drivers / binaries needed from Avantes
    * Linux: libavs.so
    * Windows: avaspecx64.dll
+   * MacOS: libavs.dylib
    * any: avaspec.py

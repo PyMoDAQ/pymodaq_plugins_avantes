@@ -1,16 +1,17 @@
 import numpy as np
 import csv, time
-from pymodaq.utils.gui_utils.custom_app import CustomApp
-from pymodaq.utils.gui_utils import DockArea, Dock
-from pymodaq.control_modules.daq_viewer import DAQ_Viewer
-from pymodaq.utils.plotting.data_viewers.viewer1D import Viewer1D
-from pymodaq.utils.data import DataToExport, DataFromPlugins
 from PyQt5.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
     QFileDialog
 from PyQt5.QtCore import QByteArray, QSettings, QTimer
 from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
 from pyqtgraph import PlotItem, PlotDataItem, ViewBox
 from pyqtgraph import GraphicsWidget, PlotWidget
+from pymodaq.control_modules.daq_viewer import DAQ_Viewer
+from pymodaq.utils.data import DataToExport, DataFromPlugins
+from pymodaq_gui.utils.custom_app import CustomApp
+from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
+from pymodaq_gui.utils.dock import DockArea, Dock
+
 
 class AvantesMain(QMainWindow):
 
@@ -70,14 +71,15 @@ class AvantesApp(CustomApp):
                'tip': 'Logarithmic points per time decade measurement'},
               ]
 
-    def __init__(self, parent: DockArea, plugin="avantes"):
+    def __init__(self, parent: DockArea, plugin="Avantes"):
         super().__init__(parent)
 
         self.plugin = plugin
         self.setup_ui()
 
         # keep screen geometry between runs, could be integrated into
-        # PyMoDAQ settings
+        # PyMoDAQ settings, is kind of messy because Qt and pyqtgraph don't
+        # handle the matter very consistently.
         settings = QSettings("chiphy", "avantes")
         geometry = settings.value("geometry", QByteArray())
         self.mainwindow.restoreGeometry(geometry)
@@ -87,6 +89,13 @@ class AvantesApp(CustomApp):
                 self.dockarea.restoreState(state)
             except: # pyqtgraph's state restoring is not very fail safe
                 settings.setValue("dockarea", None)
+        header = settings.value("settings-header-0", None)
+        if header is not None:
+            self._settings_tree.widget.header().resizeSection(0, int(header))
+        header = settings.value("settings-header-1", None)
+        if header is not None:
+            self._settings_tree.widget.header().resizeSection(1, int(header))
+
         self.measurement_mode = RAW
         self.have_background = False
         self.have_reference = False
@@ -144,7 +153,7 @@ class AvantesApp(CustomApp):
 
         # separate window with raw detector data
         self.daq_viewer_area = DockArea()
-        self.detector = DAQ_Viewer(self.daq_viewer_area,  title="Avantes")
+        self.detector = DAQ_Viewer(self.daq_viewer_area, title="Avantes")
         self.detector.daq_type = 'DAQ1D'
         self.detector.detector = self.plugin
         self.detector.init_hardware()
@@ -411,11 +420,15 @@ class AvantesApp(CustomApp):
         settings = QSettings("chiphy", "avantes")
         settings.setValue("geometry", self.mainwindow.saveGeometry())
         settings.setValue("dockarea", self.dockarea.saveState())
+        settings.setValue("settings-header-0",
+                          self._settings_tree.widget.header().sectionSize(0))
+        settings.setValue("settings-header-1",
+                          self._settings_tree.widget.header().sectionSize(1))
 
 
 def main():
     import sys
-    from pymodaq.utils.gui_utils.utils import mkQApp
+    from pymodaq_gui.utils.utils import mkQApp
     from PyQt5.QtCore import pyqtRemoveInputHook
     app = mkQApp('Avantes')
     pyqtRemoveInputHook()
