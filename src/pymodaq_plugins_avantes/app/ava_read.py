@@ -1,8 +1,9 @@
 import numpy as np
 import csv, time
+from PyQt5.QtCore import QByteArray, QSettings, QTimer
+from PyQt5.QtGui import QKeySequence
 from PyQt5.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
     QFileDialog
-from PyQt5.QtCore import QByteArray, QSettings, QTimer
 from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
 from pyqtgraph import PlotItem, PlotDataItem, ViewBox
 from pyqtgraph import GraphicsWidget, PlotWidget
@@ -36,6 +37,7 @@ CONTINUOUS = 0
 LINEAR     = 1
 LIN_LOG    = 2
 
+
 class AvantesApp(CustomApp):
 
     measurement_modes = { 'Raw': RAW, 'Background Subtracted': WITH_BACKGROUND,
@@ -46,7 +48,7 @@ class AvantesApp(CustomApp):
     visible_params = { CONTINUOUS: [], LINEAR: ['linear_step', 'scan_end'],
                        LIN_LOG: scan_params }
 
-    params = [{'name': 'integration_time', 'title': 'Integration Time',
+    params = [{'name': 'integration_time', 'title': 'Integration Time [sec]',
                'type': 'float', 'min': 0.001, 'max': 100, 'value': 0.05,
                'tip': 'Integration time in seconds'},
               {'name': 'averaging', 'title': 'Averaging',
@@ -57,13 +59,13 @@ class AvantesApp(CustomApp):
                'tip': 'Measurement Mode'},
               {'name': 'scan_mode', 'title': 'Scan Mode', 'type': 'list',
                'limits': list(scan_modes.keys()), 'tip': 'Scan Mode'},
-              {'name': 'linear_step', 'title': 'Linear Scan Step',
+              {'name': 'linear_step', 'title': 'Linear Scan Step [sec]',
                'type': 'float', 'min': 0.001, 'max': 1000, 'value': 1,
                'tip': 'Scan step in seconds'},
-              {'name': 'scan_end', 'title': 'Scan End', 'value': 100,
+              {'name': 'scan_end', 'title': 'Scan End [sec]', 'value': 100,
                'type': 'float', 'min': 1, 'max': 10000,
                'tip': 'End of measurement in seconds'},
-              {'name': 'log_start', 'title': 'Log Start',
+              {'name': 'log_start', 'title': 'Log Start [sec]',
                'type': 'float', 'min': 1, 'max': 10000, 'value': 10,
                'tip': 'Start of logarithmic scale in seconds'},
               {'name': 'points_per_decade', 'title': 'Points per Decade',
@@ -77,24 +79,25 @@ class AvantesApp(CustomApp):
         self.plugin = plugin
         self.setup_ui()
 
-        # keep screen geometry between runs, could be integrated into
-        # PyMoDAQ settings, is kind of messy because Qt and pyqtgraph don't
-        # handle the matter very consistently.
+        # keep screen geometry between runs, should be integrated into
+        # PyMoDAQ settings. Is anyway kind of messy because Qt and
+        # pyqtgraph don't handle the matter very consistently.
         settings = QSettings("chiphy", "avantes")
         geometry = settings.value("geometry", QByteArray())
         self.mainwindow.restoreGeometry(geometry)
-        state = settings.value("dockarea")
+        state = settings.value("dockarea", None)
         if state is not None:
             try:
                 self.dockarea.restoreState(state)
             except: # pyqtgraph's state restoring is not very fail safe
+                # erease inconsistent settings in case pyqtgraph trips
                 settings.setValue("dockarea", None)
+
+        # Retrieve spacing of first column in case the user has made it fully
+        # visible in a previous run of the program.
         header = settings.value("settings-header-0", None)
         if header is not None:
             self._settings_tree.widget.header().resizeSection(0, int(header))
-        header = settings.value("settings-header-1", None)
-        if header is not None:
-            self._settings_tree.widget.header().resizeSection(1, int(header))
 
         self.measurement_mode = RAW
         self.have_background = False
@@ -159,8 +162,8 @@ class AvantesApp(CustomApp):
         self.detector.init_hardware()
 
     def setup_actions(self):
-        self.add_action('quit', 'Quit', 'close2', "Quit program",
-                        checkable=False, toolbar=self.toolbar)
+        #self.add_action('quit', 'Quit', 'close2', "Quit program",
+        #                checkable=False, toolbar=self.toolbar)
         self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
                         "Acquire", checkable=False, toolbar=self.toolbar)
         self.add_action('background', 'Take Background', 'camera',
@@ -173,10 +176,11 @@ class AvantesApp(CustomApp):
                         checkable=True, toolbar=self.toolbar)
 
     def connect_things(self):
-        self.connect_action('quit', self.quit_function)
+#        self.connect_action('quit', self.quit_function)
+        self.quit_action.triggered.connect(self.mainwindow.close)
         self.connect_action('save', self.save_current_data)
         self.connect_action('show', self.show_detector)
-        self.connect_action('acquire', self.acquire)
+        self.connect_action('acquire', self.start_acquiring)
         self.connect_action('background', self.take_background)
         self.connect_action('reference', self.take_reference)
         self.detector.grab_done_signal.connect(self.show_data)
@@ -186,7 +190,8 @@ class AvantesApp(CustomApp):
         self.affect_to('save', file_menu)
 
         file_menu.addSeparator()
-        self.affect_to('quit', file_menu)
+        self.quit_action = file_menu.addAction("Quit", QKeySequence('Ctrl+Q'))
+        #self.affect_to('quit', file_menu)
 
     def value_changed(self, param):
         if param.name() == "integration_time":
@@ -198,11 +203,13 @@ class AvantesApp(CustomApp):
             self.detector.controller.set_integration_time(param.value() * 1000)
             self.have_background = False
             self.have_reference = False
+            self.adjust_actions()
         if param.name() == "averaging":
             self.detector.settings.child('main_settings', 'Naverage') \
                                          .setValue(param.value())
             self.have_background = False
             self.have_reference = False
+            self.adjust_actions()
         elif param.name() == "measurement_mode":
             self.measurement_mode = self.measurement_modes[param.value()]
         elif param.name() == "scan_mode":
@@ -250,7 +257,10 @@ class AvantesApp(CustomApp):
         """
         data1D = data.get_data_from_dim('Data1D')
         signal = data1D[0]
-        ava_time_stamp = data.get_data_from_name('timestamp')[0][0] / 100
+        try:
+            ava_time_stamp = data.get_data_from_name('timestamp')[0][0] / 100
+        except:
+            ava_time_stamp = 0
         system_time_stamp = time.time_ns() * 1e-6
 
         if self.measurement_mode != RAW:
@@ -295,29 +305,30 @@ class AvantesApp(CustomApp):
             self.write_spectrum(int(system_time_stamp + 0.5),
                                 int(ava_time_stamp + 0.5), self.current_data)
 
-        # advance time index until next measurement is in futur
+        # advance time index until next measurement is in future
         old_idx = self.current_time_index
         while self.scheduled_measurement_times[self.current_time_index] \
               <= system_time_stamp:
             self.current_time_index += 1
             if self.current_time_index == len(self.scheduled_measurement_times):
-                self.data_file.close()
+                self.data_file.close() # done
                 return
 
         if self.current_time_index == old_idx + 1:
+            # schedule next measurement
             time_delay = \
                 self.scheduled_measurement_times[self.current_time_index] \
                 - system_time_stamp
-            # schedule next measurement
             QTimer.singleShot(int(time_delay), self.detector.snap)
-        else: # missed scheduled point(s): restart measurement directly
+        else: # missed scheduled point(s): restart measurement immediately
             self.detector.snap()
 
-    def acquire(self):
+    def start_acquiring(self):
         """Start acquisition"""
 
         if self.acquiring: # rather stop it
             self.acquiring = False
+            self.detector.stop_grab()
             return
 
         self.acquiring = True
@@ -329,6 +340,17 @@ class AvantesApp(CustomApp):
                                              filter="*.csv")
         if result is None:
             return
+
+        # determine number of significant digits according to
+        # error = sqrt(Naverage) assuming the best case with
+        # error(Naverage=1) is 1
+        n_average = \
+            self.detector.settings.child('main_settings', 'Naverage').value()
+        if n_average > 1:
+            self.format_string = \
+                '\t{val:.%df}' % (int(np.log10(np.sqrt(n_average))) + 1)
+        else:
+            self.format_string = '\t{val:.0f}'
 
         # write wavelengths into file
         self.data_file = open(result[0], "wt")
@@ -363,18 +385,27 @@ class AvantesApp(CustomApp):
         self.data_file.write('%d\t%d'
                              % (int(np.floor(t1 + 0.5)),
                                 int(np.floor(t2 + 0.5))))
-        for value in spectrum:
-            self.data_file.write('\t%d' % (value * 1000 + 0.5))
+        if self.measurement_mode == ABSORPTION and t1 != -1:
+            for value in spectrum:
+                self.data_file.write('\t%d' % (value * 1000 + 0.5))
+        else:
+            for value in spectrum:
+                self.data_file.write(self.format_string.format(val = value))
         self.data_file.write('\n')
 
     def take_background(self):
         """Grab one background spectrum."""
 
-        data,timestamp = self.detector.controller.grab_spectrum()
-        self.background = data
+        n_average = \
+            self.detector.settings.child('main_settings', 'Naverage').value()
+        self.background,timestamp = self.detector.controller.grab_spectrum()
+        for _ in range(1, n_average):
+            data,timestamp = self.detector.controller.grab_spectrum()
+            self.background += data
+        self.background /= n_average
         self.have_background = True
         self.adjust_actions()
-        dfp = DataFromPlugins(name='Avantes', data=data, dim='Data1D',
+        dfp = DataFromPlugins(name='Avantes', data=self.background, dim='Data1D',
                               labels=['background'])
         self.spectrum_viewer.show_data(dfp)
         self.background_viewer.show_data(dfp)
@@ -382,13 +413,23 @@ class AvantesApp(CustomApp):
     def take_reference(self):
         """Grab one reference spectrum."""
 
-        data,timestamp = self.detector.controller.grab_spectrum()
-        data -= self.background
-        self.reference_valid_mask = data > 0
-        self.reference = np.where(self.reference_valid_mask, data, 1)
+        n_average = \
+            self.detector.settings.child('main_settings', 'Naverage').value()
+
+        self.reference = np.zeros(len(self.background))
+        self.reference_valid_mask = \
+            np.full(len(self.background), True, dtype=bool)
+        for _ in range(n_average):
+            data,timestamp = self.detector.controller.grab_spectrum()
+            data -= self.background
+            self.reference_valid_mask = \
+                np.logical_and(data > 0, self.reference_valid_mask)
+            self.reference += data
+
+        self.reference /= n_average
         self.have_reference = True
         self.adjust_actions()
-        dfp = DataFromPlugins(name='Avantes', data=data, dim='Data1D',
+        dfp = DataFromPlugins(name='Avantes', data=self.reference, dim='Data1D',
                               labels=['data'])
         self.spectrum_viewer.show_data(dfp)
         dfp = DataFromPlugins(name='Avantes', data=self.reference, dim='Data1D',
@@ -422,8 +463,6 @@ class AvantesApp(CustomApp):
         settings.setValue("dockarea", self.dockarea.saveState())
         settings.setValue("settings-header-0",
                           self._settings_tree.widget.header().sectionSize(0))
-        settings.setValue("settings-header-1",
-                          self._settings_tree.widget.header().sectionSize(1))
 
 
 def main():
