@@ -16,6 +16,8 @@ from pymodaq_gui.utils.dock import DockArea, Dock
 
 class AvantesMain(QMainWindow):
 
+    """Derived MainWindow class which permits to intercept close events during measurement"""
+
     def __init__(self):
         QMainWindow.__init__(self)
         self.close_enabled = True
@@ -162,8 +164,6 @@ class AvantesApp(CustomApp):
         self.detector.init_hardware()
 
     def setup_actions(self):
-        #self.add_action('quit', 'Quit', 'close2', "Quit program",
-        #                checkable=False, toolbar=self.toolbar)
         self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
                         "Acquire", checkable=False, toolbar=self.toolbar)
         self.add_action('background', 'Take Background', 'camera',
@@ -176,7 +176,6 @@ class AvantesApp(CustomApp):
                         checkable=True, toolbar=self.toolbar)
 
     def connect_things(self):
-#        self.connect_action('quit', self.quit_function)
         self.quit_action.triggered.connect(self.mainwindow.close)
         self.connect_action('save', self.save_current_data)
         self.connect_action('show', self.show_detector)
@@ -191,35 +190,40 @@ class AvantesApp(CustomApp):
 
         file_menu.addSeparator()
         self.quit_action = file_menu.addAction("Quit", QKeySequence('Ctrl+Q'))
-        #self.affect_to('quit', file_menu)
 
     def value_changed(self, param):
         if param.name() == "integration_time":
             self.detector.settings.child('detector_settings',
                                          'integration_time') \
                                   .setValue(param.value())
+            # background and reference should be measurement with the same i.t.
             if self.measurement_mode in [WITH_BACKGROUND, ABSORPTION]:
                 self.detector.stop()
             self.detector.controller.set_integration_time(param.value() * 1000)
             self.have_background = False
             self.have_reference = False
             self.adjust_actions()
+
         if param.name() == "averaging":
             self.detector.settings.child('main_settings', 'Naverage') \
                                          .setValue(param.value())
             self.have_background = False
             self.have_reference = False
             self.adjust_actions()
+
         elif param.name() == "measurement_mode":
             self.measurement_mode = self.measurement_modes[param.value()]
+
         elif param.name() == "scan_mode":
             self.detector.stop()
             self.scan_mode = self.scan_modes[param.value()]
             self.adjust_parameters()
+
         self.adjust_operation()
         self.adjust_actions()
 
     def adjust_operation(self):
+        """Stop acquisition if background / reference is missing but needed"""
         if self.measurement_mode >= WITH_BACKGROUND:
             if not self.have_background:
                 self.detector.stop()
@@ -227,6 +231,11 @@ class AvantesApp(CustomApp):
                 self.detector.stop()
 
     def adjust_actions(self):
+        """Disable actions which need other actions to be performed first.
+        A reference can only be taken when a background has been measured.
+        Acquisition in absorption mode needs a reference (and therefore also
+        a background).
+        """
         if self.measurement_mode == RAW:
             self._actions["acquire"].setEnabled(True)
             self._actions["background"].setEnabled(False)
@@ -241,6 +250,7 @@ class AvantesApp(CustomApp):
             self._actions["reference"].setEnabled(self.have_background)
 
     def adjust_parameters(self):
+        """Hide parameters which are not needed in current measurment mode."""
         for child in self.scan_params:
             if child in self.visible_params[self.scan_mode]:
                 self.settings.child(child).show()
@@ -251,7 +261,10 @@ class AvantesApp(CustomApp):
         self.daq_viewer_area.setVisible(status)
 
     def show_data(self, data: DataToExport):
-        """
+        """Display incoming data.
+
+        In linear or logarithmic scan mode: schedule next acquisition
+        afterwards.
         ----------
         data: DataToExport
         """
@@ -298,6 +311,7 @@ class AvantesApp(CustomApp):
         system_time_stamp -= self.system_start_time
 
         if self.measurement_mode == ABSORPTION:
+            # convert absorption data to mOD
             self.write_spectrum(int(system_time_stamp + 0.5),
                                 int(ava_time_stamp + 0.5),
                                 self.current_data * 1000)
@@ -366,6 +380,7 @@ class AvantesApp(CustomApp):
                 self.write_spectrum(-2, 0, self.reference)
 
         # calculate schedule, only linear for the moment, ignore lin-log
+        # QTimer counts in milliseconds
         scan_end = self.settings['scan_end'] * 1000
         linear_step = self.settings['linear_step'] * 1000
         n_measurements = int(scan_end / linear_step) + 1
@@ -380,12 +395,15 @@ class AvantesApp(CustomApp):
 
     def write_spectrum(self, t1, t2, spectrum):
         """Writes a single spectrum to file.
-           The first two columns contain the system time at data retrieval
-           and the time stamp returned by the avaspec library, respectively."""
+        The first two columns contain the system time at data retrieval
+        and the time stamp returned by the avaspec library, respectively.
+        """
         self.data_file.write('%d\t%d'
                              % (int(np.floor(t1 + 0.5)),
                                 int(np.floor(t2 + 0.5))))
         if self.measurement_mode == ABSORPTION and t1 != -1:
+            # To save space in the data file, absorption data are stored as
+            # integer numbers. 1 LSB is 1µOD.
             for value in spectrum:
                 self.data_file.write('\t%d' % (value * 1000 + 0.5))
         else:
