@@ -23,7 +23,7 @@ class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
         {'title': 'Integration time:', 'name': 'integration_time',
          'type': 'float', 'min': 0.001, 'value': 0.1,
          'tip': 'Integration time in seconds'},
-    ] + [ {'title': 'Output %d:' % (i + 1), 'name': 'output %d' % (i + 1),
+    ] + [ {'title': 'Output %d:' % (i + 1), 'name': 'output_%d' % (i + 1),
            'type': 'led_push', 'value': False,
            'tip': 'Logic level on putput %d' % (i + 1) } \
           for i in range(10)
