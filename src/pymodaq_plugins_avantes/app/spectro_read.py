@@ -14,9 +14,10 @@ from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
 from pymodaq_gui.utils.dock import DockArea, Dock
 
 
-class AvantesMain(QMainWindow):
+class MainWindow(QMainWindow):
 
-    """Derived MainWindow class which permits to intercept close events during measurement"""
+    """Derived MainWindow class which permits to intercept close events
+    during measurement"""
 
     def __init__(self):
         QMainWindow.__init__(self)
@@ -40,7 +41,7 @@ LINEAR     = 1
 LIN_LOG    = 2
 
 
-class AvantesApp(CustomApp):
+class SpectroApp(CustomApp):
 
     measurement_modes = { 'Raw': RAW, 'Background Subtracted': WITH_BACKGROUND,
                           'Absorption': ABSORPTION }
@@ -75,7 +76,7 @@ class AvantesApp(CustomApp):
                'tip': 'Logarithmic points per time decade measurement'},
               ]
 
-    def __init__(self, parent: DockArea, plugin="Avantes"):
+    def __init__(self, parent: DockArea, plugin):
         super().__init__(parent)
 
         self.plugin = plugin
@@ -84,7 +85,7 @@ class AvantesApp(CustomApp):
         # keep screen geometry between runs, should be integrated into
         # PyMoDAQ settings. Is anyway kind of messy because Qt and
         # pyqtgraph don't handle the matter very consistently.
-        settings = QSettings("chiphy", "avantes")
+        settings = QSettings("chiphy", "spectro-read")
         geometry = settings.value("geometry", QByteArray())
         self.mainwindow.restoreGeometry(geometry)
         state = settings.value("dockarea", None)
@@ -158,7 +159,7 @@ class AvantesApp(CustomApp):
 
         # separate window with raw detector data
         self.daq_viewer_area = DockArea()
-        self.detector = DAQ_Viewer(self.daq_viewer_area, title="Avantes")
+        self.detector = DAQ_Viewer(self.daq_viewer_area, title=self.plugin)
         self.detector.daq_type = 'DAQ1D'
         self.detector.detector = self.plugin
         self.detector.init_hardware()
@@ -476,7 +477,7 @@ class AvantesApp(CustomApp):
     def clean_up(self):
         self.detector.quit_fun()
         QApplication.processEvents()
-        settings = QSettings("chiphy", "avantes")
+        settings = QSettings("chiphy", "spectro-read")
         settings.setValue("geometry", self.mainwindow.saveGeometry())
         settings.setValue("dockarea", self.dockarea.saveState())
         settings.setValue("settings-header-0",
@@ -487,20 +488,28 @@ def main():
     import sys
     from pymodaq_gui.utils.utils import mkQApp
     from PyQt5.QtCore import pyqtRemoveInputHook
-    app = mkQApp('Avantes')
+
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--simulate':
+            plugin = "MockSpectro"
+        elif len(sys.argv) > 2 and sys.argv[1] == '--plugin':
+            plugin=sys.argv[2]
+            del sys.argv[2]
+            del sys.argv[1]
+        else:
+            raise RuntimeError("command line argument error")
+    else:
+        plugin='Avantes'
+
+    app = mkQApp(plugin)
     pyqtRemoveInputHook()
 
-    mainwindow = AvantesMain()
+    mainwindow = MainWindow()
     dockarea = DockArea()
     mainwindow.setCentralWidget(dockarea)
 
-    # todo: change the name here to be the same as your app class
-    if len(sys.argv) > 1 and sys.argv[1] == '--simulate':
-        prog = AvantesApp(dockarea, plugin="avantes_simu")
-    else:
-        prog = AvantesApp(dockarea)
-    mainwindow.application = prog # not very clean
-
+    prog = SpectroApp(dockarea, plugin=plugin)
+    mainwindow.application = prog # not very clean, could be done by event filter
     mainwindow.show()
 
     app.exec()
