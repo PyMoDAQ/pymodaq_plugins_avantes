@@ -1,8 +1,8 @@
 import numpy as np
 import csv, time
-from PyQt5.QtCore import QByteArray, QSettings, QTimer
-from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
+from qtpy.QtCore import QByteArray, QSettings, QTimer
+from qtpy.QtGui import QKeySequence
+from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
     QFileDialog
 from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
 from pyqtgraph import PlotItem, PlotDataItem, ViewBox
@@ -487,7 +487,7 @@ class SpectroApp(CustomApp):
 def main():
     import sys
     from pymodaq_gui.utils.utils import mkQApp
-    from PyQt5.QtCore import pyqtRemoveInputHook
+    from qtpy.QtCore import pyqtRemoveInputHook
 
     if len(sys.argv) > 1:
         if sys.argv[1] == '--simulate':

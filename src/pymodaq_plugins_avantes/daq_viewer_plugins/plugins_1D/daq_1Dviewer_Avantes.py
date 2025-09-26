@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5.QtCore import pyqtSignal
+from qtpy.QtCore import Signal
 from pymodaq.utils.daq_utils import ThreadCommand
 from pymodaq.utils.data import DataFromPlugins, Axis, DataToExport, DataRaw
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
