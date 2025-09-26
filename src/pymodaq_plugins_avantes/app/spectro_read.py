@@ -193,14 +193,14 @@ class SpectroApp(CustomApp):
         self.quit_action = file_menu.addAction("Quit", QKeySequence('Ctrl+Q'))
 
     def value_changed(self, param):
+        # <<-- param widget should be readonly during measurement
         if param.name() == "integration_time":
             self.detector.settings.child('detector_settings',
                                          'integration_time') \
-                                  .setValue(param.value())
+                                  .setValue(param.value() * 1000)
             # background and reference should be measurement with the same i.t.
             if self.measurement_mode in [WITH_BACKGROUND, ABSORPTION]:
                 self.detector.stop()
-            self.detector.controller.set_integration_time(param.value() * 1000)
             self.have_background = False
             self.have_reference = False
             self.adjust_actions()
@@ -356,6 +356,11 @@ class SpectroApp(CustomApp):
         if result is None:
             return
 
+        # <<-- unclear: where does init of param values happen?
+        
+        #self.detector.settings.child('detector_settings', 'integration_time') \
+        #    .setValue(self._settings_tree.value("integration_time") * 1000)
+        
         # determine number of significant digits according to
         # error = sqrt(Naverage) assuming the best case with
         # error(Naverage=1) is 1
@@ -415,6 +420,9 @@ class SpectroApp(CustomApp):
     def take_background(self):
         """Grab one background spectrum."""
 
+        if self.detector.controller.has_dark_shutter:
+            self.detector.controller.open_dark_shutter(False)
+
         n_average = \
             self.detector.settings.child('main_settings', 'Naverage').value()
         self.background,timestamp = self.detector.controller.grab_spectrum()
@@ -428,9 +436,14 @@ class SpectroApp(CustomApp):
                               labels=['background'])
         self.spectrum_viewer.show_data(dfp)
         self.background_viewer.show_data(dfp)
+        if self.detector.controller.has_dark_shutter:
+            self.detector.controller.open_dark_shutter(True)
 
     def take_reference(self):
         """Grab one reference spectrum."""
+
+        if self.detector.controller.has_reference_switch:
+            self.detector.controller.set_reference_switch(True)
 
         n_average = \
             self.detector.settings.child('main_settings', 'Naverage').value()
@@ -454,6 +467,10 @@ class SpectroApp(CustomApp):
         dfp = DataFromPlugins(name='Avantes', data=self.reference, dim='Data1D',
                               labels=['reference'])
         self.raw_data_viewer.show_data(dfp)
+
+        if self.detector.controller.has_reference_switch:
+            self.detector.controller.set_reference_switch(False)
+
 
     def save_current_data(self):
         """Save dat currently displayed on the main plot."""
@@ -502,7 +519,7 @@ def main():
         plugin='Avantes'
 
     app = mkQApp(plugin)
-    pyqtRemoveInputHook()
+    pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
 
     mainwindow = MainWindow()
     dockarea = DockArea()
