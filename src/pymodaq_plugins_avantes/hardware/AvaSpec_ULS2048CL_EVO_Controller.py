@@ -33,6 +33,7 @@ class AvantesController:
         """
 
         self._initialized = False
+        self.hardware_present = False
         self._serial_number = str("none")
         self._measurement_config = avaspec.MeasConfigType()
         self._device_handle = 0
@@ -79,6 +80,7 @@ class AvantesController:
         self._wavelengths = np.array_split(full_wavelength_scale, 2)[0]
         #devicetype = avaspec.AVS_GetDeviceType(globals_var.dev_handle)
 
+        self.hardware_present = True
         return True
 
     @property
