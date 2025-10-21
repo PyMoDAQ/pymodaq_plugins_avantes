@@ -35,8 +35,8 @@ Viewer1D
 Installation instructions
 =========================
 
-* PyMoDAQ 4.3.0.
-* tested: Debian Linux 11/12, Windows 10/11
+* PyMoDAQ 5.0.1
+* tested: Debian Linux 11/12
 * Drivers / binaries needed from Avantes
    * Linux: libavs.so
    * Windows: avaspecx64.dll
