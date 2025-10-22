@@ -6,7 +6,7 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
     comon_parameters, main
 from pymodaq.utils.parameter import Parameter
 from pymodaq_plugins_avantes.hardware.AvaSpec_ULS2048CL_EVO_Controller \
-    import AvantesController, AvantesSimuController
+    import AvantesController
 
 
 class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
@@ -69,7 +69,6 @@ class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
             else:
                 info = "No Avantes Spectro detected"
                 return info, False
-                self.controller = AvantesSimuController()
 
             wavelengths = self.controller.wavelengths
             self.x_axis = Axis(label='Wavelength', units='nm',
@@ -80,6 +79,8 @@ class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
                                   labels=['Avantes-Signal'])
             self.dte_signal_temp.emit(DataToExport(name='Avantes', data=[dfp]))
             self.controller.set_default_config()
+        else:
+            self.controller = controller
 
         initialized = True
 

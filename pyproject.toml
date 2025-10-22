@@ -10,9 +10,9 @@ package-url = 'https://github.com/PyMoDAQ/pymodaq_plugins_avantes'
 
 [project]
 name = "pymodaq_plugins_avantes"
-description = 'Plugin for AvaSpec ULS2048CL EVO spectrometer from Avantes'
+description = 'Plugin for spectrometers from Avantes'
 dependencies = [
-    "pymodaq>=4.3.0",
+    "pymodaq>=5.0.0",
     "pymodaq_utils",
     "pymodaq_data",
 ]

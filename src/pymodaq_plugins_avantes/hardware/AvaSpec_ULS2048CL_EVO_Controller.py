@@ -1,15 +1,17 @@
 import time,sys
 import numpy as np
 from datetime import datetime
+from enum import Enum
 from pymodaq_plugins_avantes.hardware import avaspec
 
-AvsDeviceType =         {
-                        0: "UNKNKOWN",
-                        1: "TYPE_AS5216",
-                        2: "TYPE_ASMINI",
-                        3: "TYPE_AS7010",
-                        4: "TYPE_AS7007"
-                        }
+class AvsDeviceType(Enum):
+
+    UNKNKOWN = 0
+    AS5216 = 1
+    ASMINI = 2
+    AS7010 = 3
+    AS7007 = 4
+
 
 class AvantesController:
     """
