@@ -1,29 +1,28 @@
 [features]  # defines the plugin features contained into this plugin
-instruments = true  # true if plugin contains instrument classes (else false, notice the lowercase for toml files)
-extensions = false  # true if plugins contains dashboard extensions
-models = false  # true if plugins contains pid models
-h5exporters = false  # true if plugin contains custom h5 file exporters
-scanners = false  # true if plugin contains custom scan layout (daq_scan extensions)
+instruments = true
+extensions = false
+models = false
+h5exporters = false
+scanners = false
 
 [urls]
 package-url = 'https://github.com/PyMoDAQ/pymodaq_plugins_avantes'
 
 [project]
 name = "pymodaq_plugins_avantes"
-description = 'Plugin for spectrometer from Avantes'
+description = 'Plugin for spectrometers from Avantes'
 dependencies = [
-    "pymodaq>=4.3.0",
+    "pymodaq>=5.0.0",
     "pymodaq_utils",
     "pymodaq_data",
 ]
 
 authors = [
-    {name = "Name Surname", email = "myname@test.fr"},
-    #todo: list here all authors of your plugin
+    {name = "Bernhard Lang", email = "bernhard.lang@unige.ch"},
+    {name = "Eric Studemann Lang", email = "eric.studemann@unige.ch"},
 ]
 maintainers = [
-    {name = "Name Surname", email = "myname@test.fr"},
-    #todo: list here all maintainers of your plugin
+    {name = "Bernhard Lang", email = "bernhard.lang@unige.ch"},
 ]
 
 # nottodo: leave everything below as is!
