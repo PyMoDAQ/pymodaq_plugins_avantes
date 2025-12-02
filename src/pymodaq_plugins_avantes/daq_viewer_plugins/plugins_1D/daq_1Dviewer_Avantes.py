@@ -20,14 +20,16 @@ class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
     controller_type = AvantesController
 
     params = comon_parameters+[
-        {'title': 'Integration time:', 'name': 'integration_time',
-         'type': 'float', 'min': 0.001, 'value': 0.1,
-         'tip': 'Integration time in seconds'},
+        {'title': 'Integration time [ms]:', 'name': 'integration_time',
+         'type': 'float', 'min': 1, 'value': 500,
+         'tip': 'Integration time in milliseconds'},
+        { 'title': 'X-Axis in wavenumbers:', 'name': 'wavenumber',
+          'type': 'bool', 'value': False },
     ] + [ {'title': 'Output %d:' % (i + 1), 'name': 'output_%d' % (i + 1),
            'type': 'led_push', 'value': False,
            'tip': 'Logic level on putput %d' % (i + 1) } \
           for i in range(10)
-         ]
+    ]
 
     def ini_attributes(self):
         self.controller: self.controller_type = None
@@ -35,7 +37,7 @@ class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
 
     def commit_settings(self, param: Parameter):
         if param.name() == "integration_time":
-            self.controller.set_integration_time(param.value() * 1000)
+            self.controller.set_integration_time(param.value())
         elif param.name()[:7] == 'output_':
             # Note: digital outputs are not really parameters. However and
             # for the time being, this seems to come closest to PyMoDAQ's
