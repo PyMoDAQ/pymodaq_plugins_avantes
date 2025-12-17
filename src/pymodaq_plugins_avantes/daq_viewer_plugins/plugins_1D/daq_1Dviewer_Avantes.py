@@ -21,7 +21,7 @@ class DAQ_1DViewer_Avantes(DAQ_Viewer_base):
 
     params = comon_parameters+[
         {'title': 'Integration time [ms]:', 'name': 'integration_time',
-         'type': 'float', 'min': 1, 'value': 500,
+         'type': 'float', 'min': 0.001, 'value': 500,
          'tip': 'Integration time in milliseconds'},
         { 'title': 'X-Axis in wavenumbers:', 'name': 'wavenumber',
           'type': 'bool', 'value': False },
