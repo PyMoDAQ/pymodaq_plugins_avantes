@@ -61,22 +61,29 @@ Linux
   copying it to a location where the dynamic linker will find it on your system.
   On Debian you may chose /usr/local/lib/avantes as "home" for the library.
   Copy the file libavs.so.whatever.version.number to that directory and run
-  inside that directory:
+  inside that directory
 
-  sudo ln -s libavs.so.whatever.version.number libavs.so
+  .. code-block::
 
-* Create (using sudo and your favorite editor) the file::
+    sudo ln -s libavs.so.whatever.version.number libavs.so
 
-/etc/udev/rules.d/90-avantes.rules
+* Create (using sudo and your favorite editor) the file
 
-and set its content to::
+  .. code-block::
 
-  echo "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1992\", ATTRS{idProduct}==\"0669\", MODE=\"0666\"" > /etc/udev/rules.d/30-avantes.rules
+     /etc/udev/rules.d/90-avantes.rules
 
-* Connect the spectrometer and run::
+  and set its content to
 
-  sudo udevadm control --reload-rules
-  sudo udevadm trigger
+  .. code-block::
+    echo "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1992\", ATTRS{idProduct}==\"0669\", MODE=\"0666\"" > /etc/udev/rules.d/30-avantes.rules
+
+* Connect the spectrometer and run
+
+  .. code-block::
+
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
 
 
 Windows
@@ -93,7 +100,9 @@ Windows
 Continuation on any OS
 ++++++++++++++++++++++
 
-* Inside a shell (i.e. Miniforge Prompt on Windows) run::
+* Inside a shell (i.e. Miniforge Prompt on Windows) run
+
+  .. code-block::
 
   pip install pymodaq_plugins_avantes
 
