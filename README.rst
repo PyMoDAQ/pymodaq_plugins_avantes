@@ -47,9 +47,10 @@ Installation instructions
 Linux
 +++++
 
-* Avantes publishes a Debian installation package libavs_..._amd64.deb. Run::
+* Avantes publishes a Debian installation package libavs_..._amd64.deb. Run
 
-  sudo pdkg -i libavs_..._amd64.deb
+  .. code-block::
+    sudo pdkg -i libavs_..._amd64.deb
 
   to install its contents. Depending on the configuration of the Linux brand
   you're using, the file may end up in a directory where the dynamic linker
