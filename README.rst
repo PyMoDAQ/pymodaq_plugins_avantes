@@ -45,7 +45,8 @@ Installation instructions
 
 
 Linux
------
++++++
+
 * Avantes publishes a Debian installation package libavs_..._amd64.deb. Run::
 
   sudo pdkg -i libavs_..._amd64.deb
@@ -77,7 +78,8 @@ and set its content to::
 
 
 Windows
--------
++++++++
+
 * Execute AvaspecX64DLL_...Setup_64bit.exe. The installer will ask you for a
   password which you have to get from the AvaSpec Library Manual which you
   should have received from Avantes together with the device.
@@ -87,7 +89,7 @@ Windows
   
 
 Continuation on any OS
-----------------------
+++++++++++++++++++++++
 
 * Inside a shell (i.e. Miniforge Prompt on Windows) run::
 
