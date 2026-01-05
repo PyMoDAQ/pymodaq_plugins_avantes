@@ -104,6 +104,6 @@ Continuation on any OS
 
   .. code-block::
 
-  pip install pymodaq_plugins_avantes
+    pip install pymodaq_plugins_avantes
 
 * Start the dashboard and create a preset using the avantes plugin.
