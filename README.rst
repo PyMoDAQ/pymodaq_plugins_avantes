@@ -51,15 +51,15 @@ Linux
 
   sudo pdkg -i libavs_..._amd64.deb
 
-to install its contents. Depending on the configuration of the Linux brand
-you're using, the file may end up in a directory where the dynamic linker
-doesn't find it.
+  to install its contents. Depending on the configuration of the Linux brand
+  you're using, the file may end up in a directory where the dynamic linker
+  doesn't find it.
 
-If that happens to you, you may also install the dynamic library by hand by
-copying it to a location where the dynamic linker will find it on your system.
-On Debian you may chose /usr/local/lib/avantes as "home" for the library.
-Copy the file libavs.so.whatever.version.number to that directory and run
-inside that directory:
+  If that happens to you, you may also install the dynamic library by hand by
+  copying it to a location where the dynamic linker will find it on your system.
+  On Debian you may chose /usr/local/lib/avantes as "home" for the library.
+  Copy the file libavs.so.whatever.version.number to that directory and run
+  inside that directory:
 
   sudo ln -s libavs.so.whatever.version.number libavs.so
 
