@@ -55,13 +55,11 @@ Linux
 
   to install its contents. Depending on the configuration of the Linux brand
   you're using, the file may end up in a directory where the dynamic linker
-  doesn't find it.
-
-  If that happens to you, you may also install the dynamic library by hand by
-  copying it to a location where the dynamic linker will find it on your system.
-  On Debian you may chose /usr/local/lib/avantes as "home" for the library.
-  Copy the file libavs.so.whatever.version.number to that directory and run
-  inside that directory
+  doesn't find it. If that happens to you, you may also install the dynamic
+  library by hand by copying it to a location where the dynamic linker will
+  find it on your system. On Debian you may chose /usr/local/lib/avantes as
+  "home" for the library. Copy the file libavs.so.whatever.version.number to
+  that directory and run inside that directory
 
   .. code-block::
 
@@ -76,7 +74,8 @@ Linux
   and set its content to
 
   .. code-block::
-    echo "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1992\", ATTRS{idProduct}==\"0669\", MODE=\"0666\"" > /etc/udev/rules.d/30-avantes.rules
+
+     echo "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1992\", ATTRS{idProduct}==\"0669\", MODE=\"0666\"" > /etc/udev/rules.d/30-avantes.rules
 
 * Connect the spectrometer and run
 
