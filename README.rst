@@ -75,7 +75,7 @@ Linux
 
   .. code-block::
 
-     echo "SUBSYSTEM==\"usb\", ATTRS{idVendor}==\"1992\", ATTRS{idProduct}==\"0669\", MODE=\"0666\"" > /etc/udev/rules.d/30-avantes.rules
+     SUBSYSTEM=="usb", ATTRS{idVendor}=="1992", ATTRS{idProduct}=="0669", MODE="0666"
 
 * Connect the spectrometer and run
 
