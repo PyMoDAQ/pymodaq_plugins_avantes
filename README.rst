@@ -50,6 +50,7 @@ Linux
 * Avantes publishes a Debian installation package libavs_..._amd64.deb. Run
 
   .. code-block::
+
     sudo pdkg -i libavs_..._amd64.deb
 
   to install its contents. Depending on the configuration of the Linux brand
